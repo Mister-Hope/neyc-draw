@@ -2,8 +2,13 @@ import React, { useState, useEffect, useRef } from "react";
 import { PrizeCategory } from "../types";
 import { getRandomSubset } from "../utils/lottery";
 
+interface ExtendedPrize extends PrizeCategory {
+  round: number;
+  groupInRound: "A" | "B";
+}
+
 interface DrawingStageProps {
-  currentPrize: PrizeCategory;
+  currentPrize: ExtendedPrize;
   remainingMembers: string[];
   onDrawComplete: (winners: string[]) => void;
   isLastPrize: boolean;
@@ -20,147 +25,205 @@ export const DrawingStage: React.FC<DrawingStageProps> = ({
   const [isRolling, setIsRolling] = useState(false);
   const [hasDrawn, setHasDrawn] = useState(false);
   const [displayNames, setDisplayNames] = useState<string[]>([]);
-  const rollingIntervalRef = useRef<number | null>(null);
+  // 记录当前已经“定格”的卡片数量
+  const [lockedCount, setLockedCount] = useState(0);
 
+  const shuffleIntervalRef = useRef<number | null>(null);
+  const revealIntervalRef = useRef<number | null>(null);
+  const finalWinnersRef = useRef<string[]>([]);
+  const lockedCountRef = useRef(0);
+
+  // 初始化占位符
   useEffect(() => {
-    if (!hasDrawn && !isRolling) {
-      setDisplayNames(Array(currentPrize.count).fill("虚位以待"));
-    }
-  }, [currentPrize.count, hasDrawn, isRolling]);
+    const placeholders = Array(currentPrize.count).fill("虚位以待");
+    setDisplayNames(placeholders);
+    setLockedCount(0);
+    lockedCountRef.current = 0;
 
-  const startRolling = () => {
-    setIsRolling(true);
-    setHasDrawn(false);
+    return () => clearAllIntervals();
+  }, [currentPrize.count, currentPrize.id]);
 
-    rollingIntervalRef.current = window.setInterval(() => {
-      setDisplayNames(getRandomSubset(remainingMembers, currentPrize.count));
-    }, 60);
-
-    setTimeout(() => {
-      stopRolling();
-    }, 3000);
+  const clearAllIntervals = () => {
+    if (shuffleIntervalRef.current) clearInterval(shuffleIntervalRef.current);
+    if (revealIntervalRef.current) clearInterval(revealIntervalRef.current);
   };
 
-  const stopRolling = () => {
-    if (rollingIntervalRef.current !== null) {
-      clearInterval(rollingIntervalRef.current);
-      rollingIntervalRef.current = null;
-    }
+  const startRolling = () => {
+    if (isRolling) return;
+    setIsRolling(true);
+    setHasDrawn(false);
+    setLockedCount(0);
+    lockedCountRef.current = 0;
 
+    // 1. 启动滚动效果（更新所有未锁定的卡片）
+    shuffleIntervalRef.current = window.setInterval(() => {
+      setDisplayNames((prev) => {
+        const next = [...prev];
+        // 只随机更新还未锁定的位置 (从 lockedCountRef.current 开始到结束)
+        const startIndex = lockedCountRef.current;
+        const countNeeded = currentPrize.count - startIndex;
+
+        if (countNeeded > 0) {
+          const randomNames = getRandomSubset(remainingMembers, countNeeded);
+          for (let i = 0; i < countNeeded; i++) {
+            next[startIndex + i] = randomNames[i];
+          }
+        }
+        return next;
+      });
+    }, 50); // 滚动速度
+
+    // 2. 2.5秒后开始逐个揭晓
+    setTimeout(() => {
+      startRevealing();
+    }, 2500);
+  };
+
+  const startRevealing = () => {
+    // 确定最终中奖名单
     const winners = remainingMembers.slice(0, currentPrize.count);
-    setDisplayNames(winners);
+    finalWinnersRef.current = winners;
+
+    // 启动揭晓定时器
+    // 逐个定格的速度
+    const revealSpeed = currentPrize.count > 20 ? 100 : 150;
+
+    revealIntervalRef.current = window.setInterval(() => {
+      const currentIdx = lockedCountRef.current;
+
+      if (currentIdx >= currentPrize.count) {
+        // 全部揭晓完毕
+        finishDrawing();
+        return;
+      }
+
+      // 锁定当前位置的名字 (直接修改 state 中的那一个位置)
+      // 注意：这里我们依靠 shuffleInterval 来停止更新这个位置，
+      // 同时强制将这个位置设置为最终赢家
+      setDisplayNames((prev) => {
+        const next = [...prev];
+        next[currentIdx] = finalWinnersRef.current[currentIdx];
+        return next;
+      });
+
+      // 更新锁定计数，shuffleInterval 将不再更新此索引
+      lockedCountRef.current += 1;
+      setLockedCount(lockedCountRef.current);
+    }, revealSpeed);
+  };
+
+  const finishDrawing = () => {
+    clearAllIntervals();
     setIsRolling(false);
     setHasDrawn(true);
-    onDrawComplete(winners);
+    // 确保最终展示完全正确
+    setDisplayNames(finalWinnersRef.current);
+    onDrawComplete(finalWinnersRef.current);
   };
 
   return (
     <div className="w-full max-w-6xl mx-auto flex flex-col items-center justify-center py-6 animate-fade-in">
-      {/* Header Info */}
+      {/* 轮次与奖项标题 */}
       <div className="text-center mb-10 relative">
-        <div className="inline-block px-8 py-2 rounded-full bg-red-900/40 border border-festival-gold/30 text-festival-gold text-lg mb-4 backdrop-blur-md shadow-lg">
-          本轮抽取人数：
-          <span className="font-black text-2xl">{currentPrize.count}</span> 位
+        <div className="flex items-center justify-center gap-6 mb-4">
+          <div className="px-8 py-2 rounded-full bg-red-900 border border-festival-gold/50 text-festival-gold text-xl font-bold shadow-lg">
+            第 {currentPrize.round} 轮
+          </div>
+          <div className="px-8 py-2 rounded-full bg-red-900 border border-festival-gold/50 text-festival-gold text-xl font-bold shadow-lg">
+            {currentPrize.groupInRound === "A" ? "第 1 组" : "第 2 组"}
+          </div>
         </div>
 
-        <h2 className="text-6xl md:text-8xl font-black text-white mb-4 font-serif animate-text-glow tracking-tight">
+        <h2 className="text-6xl md:text-8xl font-black text-white mb-2 font-serif animate-text-glow tracking-tight">
           {currentPrize.name}
         </h2>
 
-        <p className="text-2xl text-festival-gold-glow italic font-serif flex items-center justify-center gap-3">
-          <span className="h-px w-8 bg-festival-gold/40"></span>
-          {currentPrize.description}
-          <span className="h-px w-8 bg-festival-gold/40"></span>
+        <p className="text-3xl text-yellow-200/90 font-serif mb-6 tracking-wide drop-shadow-md">
+          “ {currentPrize.description} ”
+        </p>
+
+        <p className="text-xl text-festival-gold-glow italic font-serif flex items-center justify-center gap-3">
+          <span className="h-px w-12 bg-festival-gold/40"></span>
+          本组将抽取 {currentPrize.count} 位幸运嘉宾
+          <span className="h-px w-12 bg-festival-gold/40"></span>
         </p>
       </div>
 
-      {/* Main Drawing Area */}
-      <div className="w-full bg-gradient-to-b from-black/60 to-red-950/30 backdrop-blur-xl rounded-[40px] p-8 border border-white/10 shadow-[0_20px_60px_rgba(0,0,0,0.7)] mb-10 min-h-[480px] flex flex-col justify-center relative overflow-hidden">
-        {/* Corner Decor */}
-        <div className="absolute top-0 left-0 w-16 h-16 border-t-2 border-l-2 border-festival-gold/30 rounded-tl-[40px]"></div>
-        <div className="absolute bottom-0 right-0 w-16 h-16 border-b-2 border-r-2 border-festival-gold/30 rounded-br-[40px]"></div>
+      {/* 抽奖展示区 */}
+      <div className="w-full bg-gradient-to-b from-black/70 to-red-950/40 backdrop-blur-2xl rounded-[40px] p-8 border border-white/10 shadow-[0_20px_60px_rgba(0,0,0,0.8)] mb-10 min-h-[480px] flex flex-col justify-center relative overflow-hidden">
+        {/* 四角装饰 */}
+        <div className="absolute top-0 left-0 w-20 h-20 border-t-2 border-l-2 border-festival-gold/20 rounded-tl-[40px]"></div>
+        <div className="absolute bottom-0 right-0 w-20 h-20 border-b-2 border-r-2 border-festival-gold/20 rounded-br-[40px]"></div>
 
         <div
-          className={`grid gap-4 transition-all duration-500 ${
+          className={`grid gap-5 transition-all duration-500 ${
             currentPrize.count > 20
               ? "grid-cols-4 sm:grid-cols-6 md:grid-cols-8"
               : "grid-cols-3 sm:grid-cols-4 md:grid-cols-5"
           }`}
         >
-          {displayNames.map((name, idx) => (
-            <div
-              key={idx}
-              className={`
-                draw-card relative overflow-hidden aspect-square rounded-2xl flex items-center justify-center p-2 text-center shadow-xl border transition-all duration-300 transform-gpu
-                ${
-                  isRolling
-                    ? "bg-red-900/40 border-white/10 scale-95 blur-[0.5px]"
-                    : name === "虚位以待"
-                      ? "bg-black/40 border-yellow-500/20 animate-inner-glow"
-                      : "bg-gradient-to-br from-red-600 via-red-700 to-red-900 border-festival-gold shadow-[0_0_20px_rgba(220,38,38,0.5)] scale-100"
-                }
-                ${!isRolling && hasDrawn ? "animate-bounce-custom" : ""}
-              `}
-              style={{
-                animationDelay: !isRolling && hasDrawn ? `${idx * 40}ms` : "0s",
-              }}
-            >
-              {/* Background watermark for placeholder */}
-              {name === "虚位以待" && (
-                <span className="absolute inset-0 flex items-center justify-center text-5xl font-black text-white/5 pointer-events-none select-none">
-                  福
-                </span>
-              )}
+          {displayNames.map((name, idx) => {
+            // 判断该卡片是否已经“定格”
+            // 只有当 isRolling 为 true，且 idx 小于 lockedCount 时，才算抽奖过程中的“定格”
+            // 当 isRolling 为 false (抽奖彻底结束) 时，所有卡片都是定格状态
+            const isLocked =
+              (!isRolling && hasDrawn) || (isRolling && idx < lockedCount);
+            const isWaiting = !isRolling && !hasDrawn; // 初始状态
 
-              <span
+            return (
+              <div
+                key={idx}
                 className={`
-                font-bold transition-all duration-300 tracking-tight
-                ${
-                  name === "虚位以待"
-                    ? "text-yellow-100 text-lg md:text-xl opacity-100 drop-shadow-[0_0_15px_rgba(252,211,77,0.9)]"
-                    : isRolling
-                      ? "text-gray-200 text-lg md:text-xl"
-                      : "text-white text-xl md:text-2xl drop-shadow-lg font-black"
-                }
-              `}
+                  draw-card relative overflow-hidden aspect-square rounded-2xl flex items-center justify-center p-2 text-center shadow-xl border transition-all duration-300 transform-gpu
+                  ${
+                    isWaiting
+                      ? "bg-black/50 border-yellow-500/20 animate-inner-glow"
+                      : isLocked
+                        ? "bg-gradient-to-br from-red-600 via-red-700 to-red-900 border-festival-gold shadow-[0_0_25px_rgba(220,38,38,0.4)] scale-100 z-10"
+                        : "bg-red-900/40 border-white/10 scale-95 blur-[0.5px]" // 滚动状态
+                  }
+                `}
               >
-                {name}
-              </span>
+                <span
+                  className={`
+                  font-bold transition-all duration-300 tracking-tight
+                  ${
+                    name === "虚位以待"
+                      ? "text-yellow-100/40 text-lg md:text-xl"
+                      : "text-white text-xl md:text-2xl drop-shadow-lg font-black"
+                  }
+                  ${isLocked ? "scale-110" : "scale-100"}
+                `}
+                >
+                  {name}
+                </span>
 
-              {!isRolling && hasDrawn && (
-                <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/40 to-white/0 translate-x-[-150%] animate-shine pointer-events-none"></div>
-              )}
-            </div>
-          ))}
+                {/* 刚刚定格时的闪光效果 */}
+                {isLocked && (
+                  <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/40 to-white/0 translate-x-[-150%] animate-shine pointer-events-none"></div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* Buttons */}
+      {/* 操作按钮区 */}
       <div className="flex flex-col items-center gap-6">
-        {!hasDrawn && !isRolling && (
+        {!isRolling && !hasDrawn && (
           <button
             onClick={startRolling}
-            className="group relative px-24 py-6 text-4xl font-black text-red-900 bg-gradient-to-r from-yellow-200 via-yellow-400 to-yellow-500 rounded-full shadow-[0_0_40px_rgba(252,211,77,0.5)] hover:shadow-[0_0_70px_rgba(252,211,77,0.8)] hover:scale-110 active:scale-95 flex items-center gap-4 overflow-hidden transform-gpu transition-all duration-700 cubic-bezier(0.34, 1.56, 0.64, 1)"
+            className="group relative px-24 py-6 text-4xl font-black text-red-900 bg-gradient-to-r from-yellow-200 via-yellow-400 to-yellow-500 rounded-full shadow-[0_15px_40px_rgba(252,211,77,0.5)] hover:scale-110 active:scale-95 transition-all duration-500 overflow-hidden"
           >
-            <span className="relative z-10">开始抽奖</span>
-            <div className="w-12 h-12 bg-red-900/10 rounded-full flex items-center justify-center relative z-10 group-hover:bg-red-900/20 transition-all duration-500">
-              <svg
-                className="w-7 h-7 animate-pulse"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" />
-              </svg>
-            </div>
-            {/* Smooth Shine Sweep */}
+            <span className="relative z-10">开启</span>
             <div className="absolute inset-0 bg-white/30 translate-x-[-150%] group-hover:translate-x-[150%] transition-transform duration-1000 ease-in-out skew-x-12"></div>
           </button>
         )}
 
         {isRolling && (
-          <div className="px-16 py-6 text-3xl font-black bg-black/50 text-festival-gold rounded-full border-2 border-festival-gold/50 backdrop-blur-md animate-pulse shadow-2xl flex items-center gap-4">
+          <div className="px-20 py-6 text-3xl font-black bg-black/60 text-festival-gold rounded-full border-2 border-festival-gold/50 backdrop-blur-xl animate-pulse shadow-2xl flex items-center gap-4">
             <span className="animate-bounce">🏮</span>
-            正在揭晓幸运儿...
+            正在为您揭晓...
             <span className="animate-bounce" style={{ animationDelay: "0.2s" }}>
               🏮
             </span>
@@ -170,9 +233,13 @@ export const DrawingStage: React.FC<DrawingStageProps> = ({
         {hasDrawn && (
           <button
             onClick={onNextStage}
-            className="group px-14 py-5 text-2xl font-black bg-red-600 border-4 border-yellow-400 text-white rounded-full shadow-[0_10px_40px_rgba(220,38,38,0.6)] hover:bg-red-500 hover:scale-105 active:scale-95 transform-gpu transition-all duration-700 cubic-bezier(0.34, 1.56, 0.64, 1) flex items-center gap-4"
+            className="group px-16 py-5 text-2xl font-black bg-red-700 border-4 border-yellow-400 text-white rounded-full shadow-[0_15px_45px_rgba(185,28,28,0.5)] hover:bg-red-600 hover:scale-105 active:scale-95 transform-gpu transition-all duration-700 flex items-center gap-4"
           >
-            {isLastPrize ? "查看最终大榜" : "准备下一轮"}
+            {currentPrize.groupInRound === "A"
+              ? "继续第 2 组"
+              : isLastPrize
+                ? "完成全部抽奖"
+                : `结束第 ${currentPrize.round} 轮`}
             <svg
               className="w-8 h-8 group-hover:translate-x-2 transition-transform duration-500"
               fill="none"

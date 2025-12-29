@@ -1,7 +1,10 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { Layout } from "./components/Layout";
 import { StartStage } from "./components/StartStage";
+import { RoundIntroStage } from "./components/RoundIntroStage";
 import { DrawingStage } from "./components/DrawingStage";
+import { IntermediateResultsStage } from "./components/IntermediateResultsStage";
+import { FinalBlessingStage } from "./components/FinalBlessingStage";
 import { ResultsStage } from "./components/ResultsStage";
 import { AppStage, Winner } from "./types";
 import { PRIZES, MEMBER_LIST, STORAGE_KEY } from "./constants";
@@ -20,16 +23,13 @@ const App: React.FC = () => {
   const [winners, setWinners] = useState<Winner[]>([]);
   const [currentPrizeIndex, setCurrentPrizeIndex] = useState(0);
   const [hasSavedSession, setHasSavedSession] = useState(false);
+  const [lastBatchWinners, setLastBatchWinners] = useState<string[]>([]);
 
-  // Check for saved session on mount
   useEffect(() => {
     const savedData = localStorage.getItem(STORAGE_KEY);
-    if (savedData) {
-      setHasSavedSession(true);
-    }
+    if (savedData) setHasSavedSession(true);
   }, []);
 
-  // Helper to save current progress
   const saveProgress = (
     newStage: AppStage,
     newRemaining: string[],
@@ -56,34 +56,25 @@ const App: React.FC = () => {
         setStage(parsed.stage);
       }
     } catch (e) {
-      console.error("Failed to load saved session", e);
-      // If error, force clear
       localStorage.removeItem(STORAGE_KEY);
       setHasSavedSession(false);
     }
   }, []);
 
   const startLottery = useCallback(() => {
-    // Clear previous session when starting fresh
     localStorage.removeItem(STORAGE_KEY);
     setHasSavedSession(false);
-
-    // 1. Shuffle everyone at the very beginning to ensure random order
     const shuffled = shuffleArray(MEMBER_LIST);
     setRemainingMembers(shuffled);
     setWinners([]);
     setCurrentPrizeIndex(0);
-    setStage(AppStage.DRAWING);
-
-    // Initial Save
-    saveProgress(AppStage.DRAWING, shuffled, [], 0);
+    setStage(AppStage.ROUND_INTRO);
+    saveProgress(AppStage.ROUND_INTRO, shuffled, [], 0);
   }, []);
 
-  const handleRoundComplete = useCallback(
+  const handleDrawComplete = useCallback(
     (roundWinners: string[]) => {
       const currentPrize = PRIZES[currentPrizeIndex];
-
-      // Create winner objects
       const newWinnersList: Winner[] = roundWinners.map((name) => ({
         name,
         prizeName: currentPrize.name,
@@ -95,36 +86,54 @@ const App: React.FC = () => {
         (m) => !roundWinners.includes(m),
       );
 
-      // Update State
       setWinners(updatedWinners);
       setRemainingMembers(updatedRemaining);
+      setLastBatchWinners(roundWinners);
 
-      // Save Progress immediately
-      // Note: We are still at 'DRAWING' stage visually until user clicks next,
-      // but the data is committed.
-      saveProgress(stage, updatedRemaining, updatedWinners, currentPrizeIndex);
+      // 每组抽完后，立即显示中间结果屏
+      setStage(AppStage.INTERMEDIATE_RESULTS);
+      saveProgress(
+        AppStage.INTERMEDIATE_RESULTS,
+        updatedRemaining,
+        updatedWinners,
+        currentPrizeIndex,
+      );
     },
-    [currentPrizeIndex, winners, remainingMembers, stage],
+    [currentPrizeIndex, winners, remainingMembers],
   );
 
-  const goToNextStage = useCallback(() => {
-    let nextStage = stage;
-    let nextIndex = currentPrizeIndex;
+  const goToNextStep = useCallback(() => {
+    const isLastPrize = currentPrizeIndex === PRIZES.length - 1;
 
-    if (currentPrizeIndex < PRIZES.length - 1) {
-      nextIndex = currentPrizeIndex + 1;
-      setCurrentPrizeIndex(nextIndex);
-    } else {
-      nextStage = AppStage.RESULTS;
-      setStage(AppStage.RESULTS);
+    if (isLastPrize) {
+      setStage(AppStage.FINAL_BLESSING);
+      saveProgress(
+        AppStage.FINAL_BLESSING,
+        remainingMembers,
+        winners,
+        currentPrizeIndex,
+      );
+      return;
     }
 
-    // Save Progress
-    saveProgress(nextStage, remainingMembers, winners, nextIndex);
-  }, [currentPrizeIndex, remainingMembers, winners, stage]);
+    const nextIndex = currentPrizeIndex + 1;
+    const nextPrize = PRIZES[nextIndex];
+    const currentPrizeObj = PRIZES[currentPrizeIndex];
+
+    setCurrentPrizeIndex(nextIndex);
+
+    // 如果下一组是新的一轮的开始（即 round 变了），进入 ROUND_INTRO
+    if (nextPrize.round !== currentPrizeObj.round) {
+      setStage(AppStage.ROUND_INTRO);
+      saveProgress(AppStage.ROUND_INTRO, remainingMembers, winners, nextIndex);
+    } else {
+      // 否则（同一轮的 B 组），直接开始抽奖
+      setStage(AppStage.DRAWING);
+      saveProgress(AppStage.DRAWING, remainingMembers, winners, nextIndex);
+    }
+  }, [currentPrizeIndex, remainingMembers, winners]);
 
   const handleRestart = useCallback(() => {
-    // When restarting from Results, we clear storage
     localStorage.removeItem(STORAGE_KEY);
     setHasSavedSession(false);
     setStage(AppStage.START);
@@ -142,14 +151,45 @@ const App: React.FC = () => {
         />
       )}
 
+      {stage === AppStage.ROUND_INTRO && (
+        <RoundIntroStage
+          round={currentPrize.round}
+          onContinue={() => {
+            setStage(AppStage.DRAWING);
+            saveProgress(
+              AppStage.DRAWING,
+              remainingMembers,
+              winners,
+              currentPrizeIndex,
+            );
+          }}
+        />
+      )}
+
       {stage === AppStage.DRAWING && (
         <DrawingStage
-          key={currentPrize.id} // Re-mount component on prize change to reset internal state
+          key={currentPrize.id}
           currentPrize={currentPrize}
-          remainingMembers={remainingMembers} // This passes the currently available pool
-          onDrawComplete={handleRoundComplete}
+          remainingMembers={remainingMembers}
+          onDrawComplete={handleDrawComplete}
           isLastPrize={currentPrizeIndex === PRIZES.length - 1}
-          onNextStage={goToNextStage}
+          onNextStage={goToNextStep}
+        />
+      )}
+
+      {stage === AppStage.INTERMEDIATE_RESULTS && (
+        <IntermediateResultsStage
+          prizeName={currentPrize.name}
+          winners={lastBatchWinners}
+          onNext={goToNextStep}
+          isLast={currentPrizeIndex === PRIZES.length - 1}
+        />
+      )}
+
+      {stage === AppStage.FINAL_BLESSING && (
+        <FinalBlessingStage
+          onReview={() => setStage(AppStage.RESULTS)}
+          onRestart={handleRestart}
         />
       )}
 

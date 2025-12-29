@@ -3,6 +3,8 @@ export interface PrizeCategory {
   name: string;
   count: number;
   description: string;
+  round: number;
+  groupInRound: "A" | "B";
 }
 
 export interface Winner {
@@ -13,6 +15,9 @@ export interface Winner {
 
 export enum AppStage {
   START = "START",
+  ROUND_INTRO = "ROUND_INTRO",
   DRAWING = "DRAWING",
+  INTERMEDIATE_RESULTS = "INTERMEDIATE_RESULTS",
+  FINAL_BLESSING = "FINAL_BLESSING",
   RESULTS = "RESULTS",
 }

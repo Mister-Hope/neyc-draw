@@ -5,16 +5,16 @@ interface LayoutProps {
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
-  // Helper to render a lantern string
-  const renderLanternString = (count: number) => (
+  // Helper to render lanterns
+  const renderLanterns = (count: number, hasString: boolean = true) => (
     <div className="flex space-x-6">
       {[...Array(count)].map((_, i) => (
         <div
           key={i}
-          className="flex flex-col items-center transform origin-top animate-float"
+          className={`flex flex-col items-center transform ${hasString ? "origin-top" : "origin-center"} animate-float`}
           style={{ animationDelay: `${i * 0.5}s` }}
         >
-          <div className="w-1 h-16 bg-yellow-600"></div>
+          {hasString && <div className="w-1 h-16 bg-yellow-600"></div>}
           <div className="w-16 h-20 bg-red-600 rounded-lg shadow-[0_0_15px_rgba(220,38,38,0.5)] border-2 border-yellow-400 flex items-center justify-center relative">
             <span className="text-yellow-300 text-2xl font-serif font-bold">
               福
@@ -41,10 +41,18 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* Lantern Strings - Positioned safely at top sides */}
       <div className="absolute top-0 left-10 pointer-events-none z-0 hidden lg:block">
-        {renderLanternString(2)}
+        {renderLanterns(2, true)}
       </div>
       <div className="absolute top-0 right-10 pointer-events-none z-0 hidden lg:block">
-        {renderLanternString(2)}
+        {renderLanterns(2, true)}
+      </div>
+
+      {/* Bottom Lanterns - Positioned at bottom corners without strings */}
+      <div className="absolute bottom-24 left-10 pointer-events-none z-0 hidden lg:block">
+        {renderLanterns(1, false)}
+      </div>
+      <div className="absolute bottom-24 right-10 pointer-events-none z-0 hidden lg:block">
+        {renderLanterns(1, false)}
       </div>
 
       {/* Main Container: Centered Vertically and Horizontally */}

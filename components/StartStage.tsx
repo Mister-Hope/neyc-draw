@@ -34,7 +34,8 @@ export const StartStage: React.FC<StartStageProps> = ({
   return (
     <div className="flex flex-col items-center justify-center h-full min-h-[80vh] animate-fade-in-up">
       <div className="mb-10 text-center">
-        <h2 className="text-2xl md:text-4xl text-festival-gold font-serif mb-4 tracking-widest opacity-90 animate-float">
+        {/* Removed animate-float from subtitle */}
+        <h2 className="text-2xl md:text-4xl text-festival-gold font-serif mb-4 tracking-widest opacity-90">
           {SUB_TITLE}
         </h2>
         <h1 className="text-5xl md:text-8xl font-black text-white drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)] tracking-tighter animate-text-glow">
