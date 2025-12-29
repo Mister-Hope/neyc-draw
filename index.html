@@ -24,8 +24,10 @@
               "bounce-slow": "bounce 3s infinite",
               "pulse-fast": "pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite",
               float: "float 6s ease-in-out infinite",
+              "float-delayed": "float 6s ease-in-out 3s infinite",
               "text-glow": "text-glow 2s ease-in-out infinite alternate",
               "inner-glow": "inner-glow 1.5s ease-in-out infinite alternate",
+              swing: "swing 3s ease-in-out infinite",
             },
             keyframes: {
               float: {
@@ -47,6 +49,10 @@
                   "box-shadow": "inset 0 0 10px rgba(252, 211, 77, 0.2)",
                 },
                 to: { "box-shadow": "inset 0 0 30px rgba(252, 211, 77, 0.5)" },
+              },
+              swing: {
+                "0%, 100%": { transform: "rotate(-5deg)" },
+                "50%": { transform: "rotate(5deg)" },
               },
             },
           },

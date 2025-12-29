@@ -1,5 +1,5 @@
 import React from "react";
-import { Winner, PrizeCategory } from "../types";
+import { Winner } from "../types";
 import { PRIZES } from "../constants";
 
 interface ResultsStageProps {
