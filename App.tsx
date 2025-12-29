@@ -15,6 +15,7 @@ interface SavedState {
   remainingMembers: string[];
   winners: Winner[];
   currentPrizeIndex: number;
+  lastBatchWinners: string[];
 }
 
 const App: React.FC = () => {
@@ -35,12 +36,14 @@ const App: React.FC = () => {
     newRemaining: string[],
     newWinners: Winner[],
     newPrizeIndex: number,
+    newLastBatchWinners: string[],
   ) => {
     const stateToSave: SavedState = {
       stage: newStage,
       remainingMembers: newRemaining,
       winners: newWinners,
       currentPrizeIndex: newPrizeIndex,
+      lastBatchWinners: newLastBatchWinners,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
   };
@@ -54,6 +57,7 @@ const App: React.FC = () => {
         setWinners(parsed.winners);
         setCurrentPrizeIndex(parsed.currentPrizeIndex);
         setStage(parsed.stage);
+        setLastBatchWinners(parsed.lastBatchWinners || []);
       }
     } catch (e) {
       localStorage.removeItem(STORAGE_KEY);
@@ -69,7 +73,7 @@ const App: React.FC = () => {
     setWinners([]);
     setCurrentPrizeIndex(0);
     setStage(AppStage.ROUND_INTRO);
-    saveProgress(AppStage.ROUND_INTRO, shuffled, [], 0);
+    saveProgress(AppStage.ROUND_INTRO, shuffled, [], 0, []);
   }, []);
 
   const handleDrawComplete = useCallback(
@@ -97,6 +101,7 @@ const App: React.FC = () => {
         updatedRemaining,
         updatedWinners,
         currentPrizeIndex,
+        roundWinners,
       );
     },
     [currentPrizeIndex, winners, remainingMembers],
@@ -112,6 +117,7 @@ const App: React.FC = () => {
         remainingMembers,
         winners,
         currentPrizeIndex,
+        [],
       );
       return;
     }
@@ -125,11 +131,17 @@ const App: React.FC = () => {
     // 如果下一组是新的一轮的开始（即 round 变了），进入 ROUND_INTRO
     if (nextPrize.round !== currentPrizeObj.round) {
       setStage(AppStage.ROUND_INTRO);
-      saveProgress(AppStage.ROUND_INTRO, remainingMembers, winners, nextIndex);
+      saveProgress(
+        AppStage.ROUND_INTRO,
+        remainingMembers,
+        winners,
+        nextIndex,
+        [],
+      );
     } else {
       // 否则（同一轮的 B 组），直接开始抽奖
       setStage(AppStage.DRAWING);
-      saveProgress(AppStage.DRAWING, remainingMembers, winners, nextIndex);
+      saveProgress(AppStage.DRAWING, remainingMembers, winners, nextIndex, []);
     }
   }, [currentPrizeIndex, remainingMembers, winners]);
 
@@ -161,6 +173,7 @@ const App: React.FC = () => {
               remainingMembers,
               winners,
               currentPrizeIndex,
+              [],
             );
           }}
         />

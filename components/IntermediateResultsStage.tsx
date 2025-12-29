@@ -30,7 +30,6 @@ export const IntermediateResultsStage: React.FC<
           喜
         </div>
 
-        {/* 结果网格 - 使用与抽奖页面完全一致的正方形布局和间距 */}
         <div
           className={`grid gap-5 ${
             winners.length > 20

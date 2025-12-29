@@ -34,7 +34,6 @@ export const StartStage: React.FC<StartStageProps> = ({
   return (
     <div className="flex flex-col items-center justify-center h-full min-h-[80vh] animate-fade-in-up">
       <div className="mb-10 text-center">
-        {/* Removed animate-float from subtitle */}
         <h2 className="text-2xl md:text-4xl text-festival-gold font-serif mb-4 tracking-widest opacity-90">
           {SUB_TITLE}
         </h2>
@@ -44,16 +43,19 @@ export const StartStage: React.FC<StartStageProps> = ({
       </div>
 
       <div className="bg-white/10 backdrop-blur-md p-10 rounded-[40px] border-2 border-festival-gold/30 shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col items-center max-w-2xl w-full relative overflow-hidden">
-        {/* Decorative elements inside the box */}
         <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl"></div>
 
-        <p className="text-2xl text-gray-200 mb-8 text-center relative z-10">
-          共有{" "}
-          <span className="text-festival-gold font-black text-5xl drop-shadow-sm px-2">
+        <div className="flex items-baseline justify-center gap-3 mb-8 relative z-10 opacity-90 font-serif">
+          <span className="text-3xl text-yellow-100/80 tracking-wider">
+            共有
+          </span>
+          <span className="text-5xl font-black text-festival-gold drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)] bottom-[-0.15em] relative">
             {MEMBER_LIST.length}
-          </span>{" "}
-          位家人们参与
-        </p>
+          </span>
+          <span className="text-3xl text-yellow-100/80 tracking-wider">
+            位家人参与
+          </span>
+        </div>
 
         <p className="text-xl text-yellow-100/80 mb-10 text-center italic font-serif relative z-10">
           “ 每一个名字都承载着一年的喜悦 ”
@@ -92,10 +94,6 @@ export const StartStage: React.FC<StartStageProps> = ({
           )}
         </div>
       </div>
-
-      <p className="mt-12 text-gray-400/60 text-sm tracking-widest uppercase">
-        点击上方按钮后将自动进入全屏模式
-      </p>
     </div>
   );
 };

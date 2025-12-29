@@ -11,7 +11,6 @@ export const ResultsStage: React.FC<ResultsStageProps> = ({
   winners,
   onRestart,
 }) => {
-  // Group winners by prize
   const winnersByPrize = PRIZES.map((prize) => ({
     ...prize,
     winners: winners.filter((w) => w.prizeId === prize.id).map((w) => w.name),
